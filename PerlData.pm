@@ -5,7 +5,7 @@ use XML::SAX::Base;
 use vars qw($VERSION @ISA $NS_XMLNS $NS_XML);
 
 # some globals
-$VERSION = '0.85';
+$VERSION = '0.87';
 @ISA = qw( XML::SAX::Base );
 $NS_XML   = 'http://www.w3.org/XML/1998/namespace';
 $NS_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -44,7 +44,6 @@ sub init {
     $self->{DefaultElementName}   = $args{defaultname}   if defined $args{defaultname};
     $self->{BindAttrs}            = 1                    if defined $args{bindattrs};
     $self->{Keymap}               ||= {};
-    $self->{Attrmap}              ||= {};
     $self->{RootName}             ||= 'document';
     $self->{DefaultElementName}   ||= 'default';
     $self->{TokenReplacementChar} ||= '_';
@@ -77,6 +76,14 @@ sub init {
         }
     }
     $self->{Namespacemap} ||= {};
+
+    if ( defined( $args{charmap} ) ) {
+        $self->{Charmap} = {};
+        while ( my ($k, $v) = ( each( %{$args{charmap}} ) )) {
+            push @{$self->{Charmap}->{$k}}, ref( $v ) ? @{$v} : $v;
+        }
+    }
+    $self->{Charmap} ||= {};
 
     # Skipelements:
     # Makes sense from an interface standpoint for the user 
@@ -154,25 +161,38 @@ sub parse_chunk {
     }
 }
 
+
 sub hashref2SAX {
     my $self = shift;
     my $hashref= shift;
 
+    my $char_data = '';
+
 ELEMENT: foreach my $key (keys (%{$hashref} )) {
          my $value = $hashref->{$key};
-         my $element_name = defined $self->{Keymap}->{$key} ? $self->{Keymap}->{$key} : $key;
+         my $element_name = $self->_keymapped_name( $key );
+             
          next if defined $self->{Skipelements}->{$element_name};
 
+       
          if ( defined $self->{_Parents}->[-1] and defined $self->{Attrmap}->{$self->{_Parents}->[-1]} ) {
              foreach my $name ( @{$self->{Attrmap}->{$self->{_Parents}->[-1]}} ) {
                  next ELEMENT if $name eq $element_name;
              }
          }
+
+         if ( defined $self->{_Parents}->[-1] and defined $self->{Charmap}->{$self->{_Parents}->[-1]} ) {
+             if ( grep {$_ eq $element_name} @{$self->{Charmap}->{$self->{_Parents}->[-1]}}  ) {
+                     $self->characters( {Data => $value });
+                     next ELEMENT;
+             }
+         }
+
          my $type = $self->get_type( $value );
 
         if ( $type eq 'ARRAY' ) {
             push @{$self->{_Parents}}, $element_name;
-            $self->arrayref2SAX( $value, $element_name );
+            $self->arrayref2SAX( $value );
             pop (@{$self->{_Parents}});
         }
         elsif ( $type eq 'HASH' ) {
@@ -181,7 +201,7 @@ ELEMENT: foreach my $key (keys (%{$hashref} )) {
             if ( defined $self->{Attrmap}->{$element_name} ) {
                 my @attr_names = ();
                 ATTR: foreach my $child ( keys( %{$value} )) {
-                    my $name = defined $self->{Keymap}->{$child} ? $self->{Keymap}->{$child} : $child;
+                    my $name = $self->_keymapped_name( $child );
                     if ( grep {$_ eq $name} @{$self->{Attrmap}->{$element_name}} ) {
                         if ( ref( $value->{$child} ) ) {
                            warn "Cannot use a reference value " . $value->{$child} . " for key '$child' as XML attribute\n";
@@ -209,32 +229,57 @@ ELEMENT: foreach my $key (keys (%{$hashref} )) {
 sub arrayref2SAX {
     my $self = shift;
     my $arrayref= shift;
-    my $temp_name = shift || $self->{DefaultElementName};
-    my $i;
-    if ( defined $self->{Keymap}->{$temp_name} ) {
-        $temp_name = $self->{Keymap}->{$temp_name};
-    }
+    my $passed_name = shift || $self->{_Parents}->[-1];
+    my $temp_name = $self->_keymapped_name( $passed_name );
 
     my $element_name;
-    for ( $i = 0; $i < @{$arrayref}; $i++ ) {
+    my $i;
+
+ELEMENT: for ( $i = 0; $i < @{$arrayref}; $i++ ) {
         if ( ref( $temp_name ) eq 'ARRAY' ) {
-            $element_name = $temp_name->[$i] || $self->{DefaultElementName};
+            my $ntest = $temp_name->[$i] || $self->{DefaultElementName};
+            if ( ref( $ntest ) eq 'CODE' ) {
+                $element_name = &{$ntest}();
+            }
+            else {
+                $element_name = $self->_keymapped_name( $ntest );
+            }
         }
         else {
             $element_name = $temp_name;
         }
 
+
         next if defined $self->{Skipelements}->{$element_name};
        
+
         my $type = $self->get_type( $arrayref->[$i] );
+
+        my $value = $arrayref->[$i];
 
         if ( $type eq 'ARRAY' ) {
             push @{$self->{_Parents}}, $element_name;
-            $self->arrayref2SAX( $arrayref->[$i], $element_name );
+            $self->arrayref2SAX( $value );
             pop (@{$self->{_Parents}});
         }
-        elsif ( $type eq 'HASH' ) {   
-            $self->start_element( $self->_start_details( $element_name ) );
+        elsif ( $type eq 'HASH' ) {
+            # attr mojo
+            my %attrs = ();
+            if ( defined $self->{Attrmap}->{$element_name} ) {
+                my @attr_names = ();
+                ATTR: foreach my $child ( keys( %{$value} )) {
+                    my $name = $self->_keymapped_name( $child );
+                    if ( grep {$_ eq $name} @{$self->{Attrmap}->{$element_name}} ) {
+                        if ( ref( $value->{$child} ) ) {
+                           warn "Cannot use a reference value " . $value->{$child} . " for key '$child' as XML attribute\n";
+                           next ATTR;
+                        }
+             
+                       $attrs{$name} = $value->{$child};
+                    }
+                }
+            }   
+            $self->start_element( $self->_start_details( $element_name, \%attrs ) );
             push @{$self->{_Parents}}, $element_name;
             $self->hashref2SAX( $arrayref->[$i] );
             pop (@{$self->{_Parents}});
@@ -246,7 +291,6 @@ sub arrayref2SAX {
             $self->end_element( $self->_end_details( $element_name ) );
         }
     }
-
 }
 
 sub get_type {
@@ -413,6 +457,69 @@ sub delete_attrmap {
     }
 }
 
+sub charmap {
+    my $self = shift;
+    my %charmap;
+    if ( scalar( @_ ) > 0 ) {
+        if ( ref( $_[0] )) {
+            %charmap = %{$_[0]};
+        }
+        else {
+            %charmap = @_;
+        }
+        
+        while ( my ($k, $v) = each( %charmap )) {
+            if ( ref( $v ) ) {
+                $self->{Charmap}->{$k} = $v;
+            }
+            else {
+                $self->{Charmap}->{$k} = [ $v ];
+            }
+        }
+    }
+        
+    return wantarray ? %{$self->{Charmap}} : $self->{Charmap};
+}
+
+sub add_charmap {
+    my $self = shift;
+    my %charmap;
+    if ( scalar( @_ ) > 0 ) {
+        if ( ref( $_[0] )) {
+            %charmap = %{$_[0]};
+        }
+        else { 
+            %charmap = @_;
+        }
+
+        while ( my ($k, $v) = each ( %charmap ) ) {
+            if ( ref( $v ) ) {
+                $self->{Charmap}->{$k} = $v;
+            }
+            else {
+                $self->{Charmap}->{$k} = [ $v ];
+            }
+        }
+    
+    }
+}
+
+sub delete_charmap {
+    my $self = shift;
+    my @mapped;  
+    if ( scalar( @_ ) > 0 ) {
+        if ( ref( $_[0] )) {
+            @mapped = @{$_[0]};  
+        }
+        else {
+            @mapped = @_;  
+        }
+        foreach my $name ( @mapped ) {  
+            delete $self->{Charmap}->{$name} if $self->{Charmap}->{$name};
+        }
+    }
+}
+
 sub add_keymap {
     my $self = shift;
     my %keymap;
@@ -572,6 +679,34 @@ sub end_tag {
 ####
 # Internal Helpers
 ###
+
+sub _keymapped_name {
+    my ($self, $name) = @_;
+    my $element_name;
+    if ( defined $self->{Keymap}->{$name} ) {
+        my $temp_name = $self->{Keymap}->{$name};
+
+        if ( ref( $temp_name ) eq 'CODE' ) {
+            $element_name = &{$temp_name}( $name );
+        }
+        else {
+            $element_name = $temp_name;
+        }
+    }
+    elsif ( defined $self->{Keymap}->{'*'} ) {
+        my $temp_name = $self->{Keymap}->{'*'};
+         
+        if ( ref( $temp_name ) eq 'CODE' ) {
+            $element_name = &{$temp_name}( $name );
+        }
+        else {
+            $element_name = $temp_name;
+        }
+    }
+    else {
+        $element_name = $name;
+    }
+}
 
 sub _start_details {
     my $self = shift;
@@ -1023,6 +1158,14 @@ When called with a hash (hash reference) as its argument, this method sets/reset
 keyname->elementname mappings definitions (where 'keyname' means the name of a given
 key in the hash and 'elementname' is the name used when firing SAX events for that key).
 
+In addition to simple name->othername mappings, value of a keymap option can also a reference
+to a subroutine (or an anonymous sub). The keyname will be passed as the sole argument to
+this subroutine and the sub is expected to return the new element name. In the cases of nested
+arrayrefs, no keyname will be passed, but you can still generate the name from scratch.
+
+Extending that idea, keymap will also accept a default mapping using the key '*' that will
+be applied to all elements that do have an explict mapping configured.
+
 To add new mappings or remove existing ones without having to reset the whole list of
 mappings, see add_keymap() and delete_keymap() respectively.
 
@@ -1035,6 +1178,12 @@ B<Examples:>
                anotherkey => 'someothername' );   
 
   $pd->keymap( \%mymap );   
+
+  # make all tags lower case
+  $pd->keymap( '*'    => sub{ return lc( $_[0];} );   
+
+  # process keys named 'keyname' with a local sub
+  $pd->keymap( keyname    => \&my_namer,
 
   my %kmap_hash = $pd->keymap();   
 
@@ -1122,6 +1271,67 @@ B<Examples:>
   $pd->delete_skipelements( 'some', 'key', 'names' );   
 
   $pd->delete_skipelements( \@keynames );   
+
+=item B<charmap>
+
+B<Accepts:> A hash (or hash reference) containing a series of parent/child keyname pairs or [none].
+
+B<Returns:> The current charmap hash (as a plain hash, or hash reference depending on caller context).
+
+When called with a hash (hash reference) as its argument, this method sets/resets the entire internal 
+keyname/elementname->characters children mappings definitions (where 'keyname' means the name of a given
+key in the hash and 'characters children' is list containing the nested keynames that should be passed as
+the text children of the element named 'keyname' (instead of being processed as child elements or attributes).
+
+To add new mappings or remove existing ones without having to reset the whole list of
+mappings, see add_charmap() and delete_charmap() respectively.
+
+See CAVEATS for the limitations that relate to this method.
+
+B<Examples:> 
+
+  $pd->charmap( elname => ['list', 'of', 'nested', 'keynames' );
+
+  $pd->charmap( \%mymap );   
+
+  my %charmap_hash = $pd->charmap();   
+
+  my $charmap_hashref = $pd->charmap();   
+
+=item B<add_charmap>
+
+B<Accepts:> A hash or hash reference containing a series of parent/child keyname pairs.
+
+B<Returns:> [none]
+
+Adds a series of parent-key -> child-key relationships that define which of the
+possible child keys will be processed as text children of the created 'parent'
+element.
+
+B<Examples:> 
+
+  $pd->add_charmap( parentname =>  ['list', 'of', 'child', 'keys'] );   
+
+  $pd->add_charmap( parentname =>  'childkey' );   
+
+  $pd->add_charmap( \%parents_and_kids );   
+
+=item B<delete_charmap>
+
+B<Accepts:> A list (or array reference) of element/keynames.
+
+B<Returns:> [none]
+
+Deletes a list of parent-key -> child-key relationships from the instance-wide
+hash of "parent->nested names to pass as text children definitions. If you
+need to alter the list of child names (without deleting the parent key) use
+add_charmap() to reset the parent-key's definition. 
+
+B<Examples:> 
+
+  $pd->delete_charmap( 'some', 'parent', 'keys' );   
+
+  $pd->delete_charmap( \@parentkeynames );   
 
 =item B<attrmap>
 

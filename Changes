@@ -1,5 +1,11 @@
 Revision history for Perl extension XML::SAX::PerlData2SAX.
 
+0.87  Fri Feb 08 2002
+	- Added 'charmap' option and methods
+	- allowed keymaps to take a coderef for renaming.
+	- added support for '*' (all keys) in keymap.
+	- added more docs.
+
 0.85  Sat Jan 26 2002
 	- fixed overzealous attribute ref() bug (Thanks to Bryan Dumm for the catch).
 	- more doc fixes.
