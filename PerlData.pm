@@ -5,7 +5,7 @@ use XML::SAX::Base;
 use vars qw($VERSION @ISA $NS_XMLNS $NS_XML);
 
 # some globals
-$VERSION = '0.83';
+$VERSION = '0.85';
 @ISA = qw( XML::SAX::Base );
 $NS_XML   = 'http://www.w3.org/XML/1998/namespace';
 $NS_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -158,7 +158,8 @@ sub hashref2SAX {
     my $self = shift;
     my $hashref= shift;
 
-ELEMENT: while ( my ($key, $value) = each (%{$hashref}) ){
+ELEMENT: foreach my $key (keys (%{$hashref} )) {
+         my $value = $hashref->{$key};
          my $element_name = defined $self->{Keymap}->{$key} ? $self->{Keymap}->{$key} : $key;
          next if defined $self->{Skipelements}->{$element_name};
 
@@ -179,14 +180,14 @@ ELEMENT: while ( my ($key, $value) = each (%{$hashref}) ){
             my %attrs = ();
             if ( defined $self->{Attrmap}->{$element_name} ) {
                 my @attr_names = ();
-                foreach my $child ( keys( %{$value} )) {
-                    if ( ref( $value->{$child} )) {
-                       warn "Cannot use a reference value " . $value->{$child} . " as XML attribute\n";
-                       next;
-                    } 
+                ATTR: foreach my $child ( keys( %{$value} )) {
                     my $name = defined $self->{Keymap}->{$child} ? $self->{Keymap}->{$child} : $child;
-                    # watch me ubu... grep is scary
                     if ( grep {$_ eq $name} @{$self->{Attrmap}->{$element_name}} ) {
+                        if ( ref( $value->{$child} ) ) {
+                           warn "Cannot use a reference value " . $value->{$child} . " for key '$child' as XML attribute\n";
+                           next ATTR;
+                        } 
+
                        $attrs{$name} = $value->{$child};
                     }
                 }
@@ -865,7 +866,7 @@ single key/element names or an array reference of key/element names.
 =item * B<skiproot> (optional)
 
 When set to a defined value, this option blocks the generator from adding
-the top-level root element when parse() or start_stream() and end_stream()
+the top-level root element when parse() or parse_start() and parse_end()
 are called. 
 
 I<Do not> use this option unless you absolutely sure you know what you 
@@ -926,7 +927,7 @@ the new() constructor description.
 
 B<Example:>
 
-  $pd->start_stream();
+  $pd->parse_start();
 
 
 =item B<parse_end>

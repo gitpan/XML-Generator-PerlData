@@ -1,18 +1,22 @@
 Revision history for Perl extension XML::SAX::PerlData2SAX.
 
-0.77  Sat Jan 26
+0.85  Sat Jan 26 2002
+	- fixed overzealous attribute ref() bug (Thanks to Bryan Dumm for the catch).
+	- more doc fixes.
+
+0.77  Sat Jan 26 2002
 	- added start/endprefix mapping events.
 
-0.73  Fri Jan 25
+0.73  Fri Jan 25 2002
 	- lots of interface cleanup.
 	- doc fixes.
 
-0.71  Fri Jan 25
+0.71  Fri Jan 25 2002
 	- added element/attr name fixing.
 
-0.50  Mon Jan 14
+0.50  Mon Jan 14 2002
 	- Initial import from backyard project.
 
-0.01  Mon Jan 14
+0.01  Mon Jan 14 2002
 	- original version; created by h2xs 1.19
 
