@@ -1,0 +1,18 @@
+Revision history for Perl extension XML::SAX::PerlData2SAX.
+
+0.77  Sat Jan 26
+	- added start/endprefix mapping events.
+
+0.73  Fri Jan 25
+	- lots of interface cleanup.
+	- doc fixes.
+
+0.71  Fri Jan 25
+	- added element/attr name fixing.
+
+0.50  Mon Jan 14
+	- Initial import from backyard project.
+
+0.01  Mon Jan 14
+	- original version; created by h2xs 1.19
+
