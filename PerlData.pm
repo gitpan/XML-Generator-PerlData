@@ -5,7 +5,7 @@ use XML::SAX::Base;
 use vars qw($VERSION @ISA $NS_XMLNS $NS_XML);
 
 # some globals
-$VERSION = '0.87';
+$VERSION = '0.89';
 @ISA = qw( XML::SAX::Base );
 $NS_XML   = 'http://www.w3.org/XML/1998/namespace';
 $NS_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -103,7 +103,7 @@ sub parse_start {
     my $self = shift;
     $self->init( @_ );
 
-    $self->start_document( document => {} );
+    $self->start_document( {} );
 
     unless ( defined $self->{SkipRoot} ) {
         $self->start_element( $self->_start_details( $self->{RootName} ) );

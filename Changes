@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::SAX::PerlData2SAX.
 
+
+0.89  Fri Jun 5 2003
+	- Fix for start_document. Bug reported by 
+	  Tim Müller-Seydlitz <tms@nagler-company.com>
+
 0.87  Fri Feb 08 2002
 	- Added 'charmap' option and methods
 	- allowed keymaps to take a coderef for renaming.
