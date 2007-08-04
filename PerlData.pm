@@ -3,9 +3,9 @@ package XML::Generator::PerlData;
 use strict;
 use XML::SAX::Base;
 use vars qw($VERSION @ISA $NS_XMLNS $NS_XML);
-
+use Data::Dumper;
 # some globals
-$VERSION = '0.89';
+$VERSION = '0.91';
 @ISA = qw( XML::SAX::Base );
 $NS_XML   = 'http://www.w3.org/XML/1998/namespace';
 $NS_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -95,13 +95,14 @@ sub init {
         %skippers = map { $_, 1} @{$args{skipelements}}
     }
 
+    #warn "SKIPPPERS " . Dumper( \%args );
     $self->{Skipelements} = \%skippers;
 
 }
 
 sub parse_start {
     my $self = shift;
-    $self->init( @_ );
+    $self->init( @_ ) if scalar @_;
 
     $self->start_document( {} );
 
