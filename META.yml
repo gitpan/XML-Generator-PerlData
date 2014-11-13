@@ -1,11 +1,25 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         XML-Generator-PerlData
-version:      0.91
-version_from: PerlData.pm
-installdirs:  site
+---
+abstract: 'Perl extension for generating SAX2 events from nested Perl data structures.'
+author:
+  - 'Kip Hampton <khampton@totalcinema.com>'
+build_requires:
+  ExtUtils::MakeMaker: '0'
+configure_requires:
+  ExtUtils::MakeMaker: '0'
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.98, CPAN::Meta::Converter version 2.142690'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: '1.4'
+name: XML-Generator-PerlData
+no_index:
+  directory:
+    - t
+    - inc
 requires:
-    XML::SAX::Base:                1.02
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+  XML::SAX::Base: '1.02'
+resources:
+  license: http://dev.perl.org/licenses
+  repository: https://github.com/ubu/xml-generator-perldata
+version: '0.93'

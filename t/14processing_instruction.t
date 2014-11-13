@@ -1,34 +1,30 @@
 use Test;
 use XML::Generator::PerlData;
-BEGIN { plan tests => 5 }
+BEGIN { plan tests => 4 }
 use vars qw/@stack/;
 my $obj     = SomeObj->new();
 my $handler = SAXDumper->new;
+
 my $tester  = XML::Generator::PerlData->new( Handler  => $handler );
 
-my $NS = 'http://localhost/ns/default';
+my %opts = ( processing_instructions => [
+                'xml-stylesheet' => {
+                    href => '/path/to/stylesheet.xsl',
+                    type => 'text/xml',
+                },
+                'xml-stylesheet' => {
+                    href => '/path/to/second/stylesheet.xsl',
+                    type => 'text/xml',
+                }
 
-$tester->add_namespace( prefix => 'ubu',
-                        uri    => 'http://localhost/ns/default'
+           ]);
 
-                       );
+$tester->parse( $obj, %opts );
 
-my %attrmap = ( zoix => ['bar', 'norkel'] );
-
-my %opts = ( attrmap => \%attrmap,
-             skipelements => ['freep'],
-             namespacemap => {'http://localhost/ns/default' => [ 'document' ]},
-             keymap => {baz => 'norkel'}
-           );
-
-my $dom = $tester->parse( $obj, %opts );
-
-
-ok( $stack[1]->{Prefix} eq 'ubu' );
-ok( $stack[1]->{NamespaceURI} eq 'http://localhost/ns/default' );
-ok( $stack[2]->{LocalName} eq 'document' );
-ok( $stack[2]->{Prefix} eq 'ubu' );
-ok( $stack[2]->{Name} eq 'ubu:document' );
+ok( $stack[1]->{Target} eq 'xml-stylesheet' );
+ok( $stack[1]->{Data} =~ m|href="/path/to/stylesheet.xsl"| );
+ok( $stack[2]->{Target} eq 'xml-stylesheet' );
+ok( $stack[2]->{Data} =~ m|href="/path/to/second/stylesheet.xsl"| );
 
 package SomeObj;
 use strict;
